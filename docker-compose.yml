@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: geoviewer_api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    networks:
+      - geoviewer_net
+
+  db:
+    image: postgres:16
+    container_name: geoviewer_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: geoviewer
+      POSTGRES_USER: geoadmin
+      POSTGRES_PASSWORD: yourpassword
+    networks:
+      - geoviewer_net
+
+volumes:
+  pg_data:
+
+networks:
+  geoviewer_net:
+
