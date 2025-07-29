@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, JSON, Float
+from sqlalchemy import Column, DateTime, func, Integer, String, Boolean, Text, JSON, Float
 from app.database import Base
 
 class Layer(Base):
@@ -24,4 +24,5 @@ class Layer(Base):
     layer_params = Column(JSON)
     extra_config = Column(JSON)
     bbox = Column(JSON)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
