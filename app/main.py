@@ -1,9 +1,13 @@
 from fastapi import FastAPI
-from app.api.routes import router
-from dotenv import load_dotenv
+from app.routes import layers
+from app.database import engine
+from app.models import models
 
-load_dotenv()  # Load .env
+# Create database tables (if using SQLAlchemy ORM)
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
-app.include_router(router)
+
+# Include router
+app.include_router(layers.router, prefix="/layers", tags=["Layers"])
 
