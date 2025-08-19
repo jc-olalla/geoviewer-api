@@ -1,6 +1,8 @@
-from pydantic import BaseModel
-from typing import Optional, Any
 from datetime import datetime
+from typing import Any, Optional
+
+from pydantic import BaseModel
+
 
 class LayerBase(BaseModel):
     viewer_id: int
@@ -10,7 +12,7 @@ class LayerBase(BaseModel):
     url: Optional[str] = None
     layer_name: Optional[str] = None
     version: Optional[str] = None
-    crs: Optional[str] = 'EPSG:3857'
+    crs: Optional[str] = "EPSG:3857"
     style: Optional[str] = None
     format: Optional[str] = None
     tiled: Optional[bool] = False
@@ -23,11 +25,14 @@ class LayerBase(BaseModel):
     extra_config: Optional[Any] = None
     bbox: Optional[Any] = None
 
+
 class LayerCreate(LayerBase):
     pass
 
+
 class LayerUpdate(LayerBase):
     pass
+
 
 class Layer(LayerBase):
     id: int
@@ -35,4 +40,3 @@ class Layer(LayerBase):
 
     class Config:
         from_attributes = True
-
