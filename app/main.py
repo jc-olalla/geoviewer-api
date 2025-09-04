@@ -11,7 +11,7 @@ app = FastAPI(title="Geoviewer Viewer API")
 # (optional) CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://your-frontend.example"],  # adjust
+    allow_origins=["http://localhost:5173", "https://geoviewer-app.onrender.com"],  # adjust
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
