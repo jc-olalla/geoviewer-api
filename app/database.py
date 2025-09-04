@@ -8,11 +8,10 @@ import threading
 from typing import Dict, Generator, Iterable, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
 
-import yaml
-
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
+import yaml
 
 # ------------------------------------------------------------------------------
 # SQLAlchemy base (models import this)
@@ -22,6 +21,7 @@ Base = declarative_base()
 # ------------------------------------------------------------------------------
 # Utilities
 # ------------------------------------------------------------------------------
+
 
 def _normalize_host(dsn: str) -> str:
     """
@@ -38,8 +38,11 @@ def _normalize_host(dsn: str) -> str:
             socket.gethostbyname(host)  # raises if not resolvable
         except socket.gaierror:
             netloc = parts.netloc.replace("host.docker.internal", "localhost", 1)
-            return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+            return urlunsplit(
+                (parts.scheme, netloc, parts.path, parts.query, parts.fragment)
+            )
     return dsn
+
 
 # ------------------------------------------------------------------------------
 # Tenant registry: maps tenant slug -> DSN
@@ -58,6 +61,7 @@ def _normalize_host(dsn: str) -> str:
 #   3) TENANT_<SLUG>_DSN env vars, e.g. TENANT_BRANDWEER_DSN=postgresql://...
 # Fallback (single-tenant): DATABASE_URL -> slug 'default'
 # ------------------------------------------------------------------------------
+
 
 class TenantRegistry:
     def __init__(self, path: Optional[str] = None) -> None:
@@ -164,7 +168,9 @@ class TenantRegistry:
                 base = yaml_map
                 base.update(self._load_env_json())
                 base.update(self._load_env_vars())
-                base.setdefault("default", self._load_default_single().get("default", None))
+                base.setdefault(
+                    "default", self._load_default_single().get("default", None)
+                )
                 self._map = {k: v for k, v in base.items() if v}
 
     def refresh(self) -> None:
@@ -183,12 +189,15 @@ class TenantRegistry:
         dsn = self._map.get(key)
         if not dsn:
             available = ", ".join(sorted(self._map)) or "(none)"
-            raise ValueError(f"No DSN configured for tenant '{tenant}'. Available: {available}")
+            raise ValueError(
+                f"No DSN configured for tenant '{tenant}'. Available: {available}"
+            )
         return dsn
 
     def tenants(self) -> Iterable[str]:
         self._maybe_reload_yaml()
         return list(self._map.keys())
+
 
 _registry = TenantRegistry()
 
@@ -199,6 +208,7 @@ _registry = TenantRegistry()
 _engine_lock = threading.Lock()
 _engines: Dict[str, Engine] = {}
 _sessions: Dict[str, sessionmaker] = {}
+
 
 def _create_engine(dsn: str) -> Engine:
     # Tune pooling for small services; ensure pre_ping to avoid stale connections.
@@ -211,6 +221,7 @@ def _create_engine(dsn: str) -> Engine:
         future=True,
     )
 
+
 def _get_engine_for_tenant(tenant: str) -> Engine:
     slug = (tenant or "default").lower()
     with _engine_lock:
@@ -219,8 +230,11 @@ def _get_engine_for_tenant(tenant: str) -> Engine:
         dsn = _registry.get_dsn(slug)
         engine = _create_engine(dsn)
         _engines[slug] = engine
-        _sessions[slug] = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+        _sessions[slug] = sessionmaker(
+            bind=engine, autoflush=False, autocommit=False, future=True
+        )
         return engine
+
 
 def dispose_all_engines() -> None:
     """Call this from your app shutdown to cleanly dispose pooled connections."""
@@ -233,9 +247,11 @@ def dispose_all_engines() -> None:
         _engines.clear()
         _sessions.clear()
 
+
 # ------------------------------------------------------------------------------
 # FastAPI-style dependencies (generators)
 # ------------------------------------------------------------------------------
+
 
 def get_db() -> Generator[Session, None, None]:
     """
@@ -251,26 +267,35 @@ def get_db() -> Generator[Session, None, None]:
     finally:
         db.close()
 
+
 def get_tenant_session(tenant: str) -> Generator[Session, None, None]:
-    """
-    Tenant-aware dependency for routes like:
-        @router.get("/tenants/{tenant}/layers")
-        def list_layers(tenant: str, db: Session = Depends(get_tenant_session)): ...
-    """
-    _get_engine_for_tenant(tenant)
+    # 1) normalize
     slug = (tenant or "default").lower()
+
+    # 2) ensure we have an engine+sessionmaker for this tenant
+    _get_engine_for_tenant(slug)
     SessionLocal = _sessions[slug]
     db = SessionLocal()
+
+    # 3) open a transaction, set search_path, keep it open for the request
+    trans = db.begin()
     try:
+        # SET LOCAL applies only to this transaction (works with pgbouncer)
+        db.execute(text(f'SET LOCAL search_path = "{slug}", public'))
         yield db
+        trans.commit()
+    except Exception:
+        trans.rollback()
+        raise
     finally:
         db.close()
+
 
 # ------------------------------------------------------------------------------
 # Helpers you might use in admin/ops scripts
 # ------------------------------------------------------------------------------
 
+
 def list_tenant_dsns() -> Iterable[Tuple[str, str]]:
     """Return (tenant, dsn) pairs currently configured."""
     return [(t, _registry.get_dsn(t)) for t in sorted(_registry.tenants())]
-
