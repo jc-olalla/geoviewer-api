@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 
 class LayerBase(BaseModel):
-    viewer_id: int
+    viewer_id: Optional[int] = None
     type: str
     name: str
     title: Optional[str] = None

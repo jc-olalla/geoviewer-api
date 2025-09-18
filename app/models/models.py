@@ -5,7 +5,6 @@ class Layer(Base):
     __tablename__ = "layers"
 
     id = Column(Integer, primary_key=True, index=True)
-    viewer_id = Column(Integer)
     type = Column(String)
     name = Column(String)
     title = Column(String)
@@ -13,7 +12,6 @@ class Layer(Base):
     layer_name = Column(String)
     version = Column(String)
     crs = Column(String)
-    style = Column(String)
     format = Column(String)
     tiled = Column(Boolean)
     opacity = Column(Float)
