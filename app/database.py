@@ -8,7 +8,7 @@ import threading
 from typing import Dict, Generator, Iterable, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 import yaml
@@ -229,6 +229,16 @@ def _get_engine_for_tenant(tenant: str) -> Engine:
             return _engines[slug]
         dsn = _registry.get_dsn(slug)
         engine = _create_engine(dsn)
+
+        # DEBUG: show effective search_path and table visibility
+        @event.listens_for(engine, "connect")
+        def _debug_on_connect(dbapi_conn, _):
+            with dbapi_conn.cursor() as cur:
+                cur.execute("show search_path")
+                print(f"[DB DEBUG] tenant={slug} search_path:", cur.fetchone()[0])
+                cur.execute("select to_regclass('public.layers'), to_regclass('layers')")
+                print(f"[DB DEBUG] tenant={slug} table vis:",
+                      cur.fetchone())  # e.g. ('public.layers', 'public.layers') or (None, None)
         _engines[slug] = engine
         _sessions[slug] = sessionmaker(
             bind=engine, autoflush=False, autocommit=False, future=True
